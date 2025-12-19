@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "encore-mcp": {
+            "args": [
+                "mcp",
+                "run",
+                "--app=poller-zy22"
+            ],
+            "command": "encore"
+        }
+    }
+}
