@@ -105,6 +105,65 @@ interface CreateCheckoutSessionResponse {
   url: string;
 }
 
+async function ensureStripeCustomerId(authData: {
+  userID: string;
+  orgID: string;
+}): Promise<string> {
+  // Prefer organization-backed customer when orgID is present, otherwise fall back to user metadata.
+  if (authData.orgID) {
+    const org = await clerk.organizations.getOrganization({
+      organizationId: authData.orgID,
+    });
+    let stripeCustomerId = org.privateMetadata.stripeCustomerId as
+      | string
+      | undefined;
+
+    if (stripeCustomerId) {
+      return stripeCustomerId;
+    }
+
+    const user = await clerk.users.getUser(authData.userID);
+    const customer = await stripe.customers.create({
+      name: org.name,
+      email: user.primaryEmailAddress?.emailAddress,
+      metadata: {
+        orgId: authData.orgID,
+      },
+    });
+    await clerk.organizations.updateOrganizationMetadata(authData.orgID, {
+      privateMetadata: {
+        stripeCustomerId: customer.id,
+      },
+    });
+    return customer.id;
+  }
+
+  // User-level fallback when no organization ID is present (org switcher disabled)
+  const user = await clerk.users.getUser(authData.userID);
+  let stripeCustomerId = (user.privateMetadata as Record<string, unknown>)
+    .stripeCustomerId as string | undefined;
+
+  if (stripeCustomerId) {
+    return stripeCustomerId;
+  }
+
+  const customer = await stripe.customers.create({
+    name: user.fullName ?? user.username ?? user.id,
+    email: user.primaryEmailAddress?.emailAddress,
+    metadata: {
+      userId: authData.userID,
+    },
+  });
+
+  await clerk.users.updateUserMetadata(authData.userID, {
+    privateMetadata: {
+      stripeCustomerId: customer.id,
+    },
+  });
+
+  return customer.id;
+}
+
 // Generate a checkout session
 export const createCheckoutSession = api(
   {
@@ -121,36 +180,12 @@ export const createCheckoutSession = api(
       throw APIError.unauthenticated("user not authenticated");
     }
 
-    // Try to get the organization's stripe customer ID
-    // This is stored as organization metadata, please see https://clerk.com/docs/organizations/metadata for more information.
-    const org = await clerk.organizations.getOrganization({
-      organizationId: authData.orgID,
-    });
-    let stripeCustomerId = org.privateMetadata.stripeCustomerId;
-
-    // If the organization doesn't have a Stripe customer ID, create one
-    if (!stripeCustomerId) {
-      const user = await clerk.users.getUser(authData.userID);
-
-      const customer = await stripe.customers.create({
-        name: org.name,
-        email: user.primaryEmailAddress?.emailAddress,
-        metadata: {
-          orgId: authData.orgID,
-        },
-      });
-      await clerk.organizations.updateOrganizationMetadata(authData.orgID, {
-        privateMetadata: {
-          stripeCustomerId: customer.id,
-        },
-      });
-      stripeCustomerId = customer.id;
-    }
+    const stripeCustomerId = await ensureStripeCustomerId(authData);
 
     const session = await stripe.checkout.sessions.create({
       billing_address_collection: "auto",
       customer: stripeCustomerId,
-      client_reference_id: authData.orgID,
+      client_reference_id: authData.orgID || authData.userID,
       line_items: [
         {
           price: params.priceId,
@@ -185,13 +220,7 @@ export const createPortalSession = api(
       throw APIError.unauthenticated("user not authenticated");
     }
 
-    // Try to get the organization's stripe customer ID
-    // This is stored as organization metadata, please see https://clerk.com/docs/organizations/metadata for more information.
-    const org = await clerk.organizations.getOrganization({
-      organizationId: authData.orgID,
-    });
-    const stripeCustomerId = org.privateMetadata.stripeCustomerId;
-
+    const stripeCustomerId = await ensureStripeCustomerId(authData);
     if (!stripeCustomerId) {
       throw APIError.notFound("user does not have a Stripe customer ID");
     }
@@ -224,12 +253,7 @@ export const getSubscription = api(
       throw APIError.unauthenticated("user not authenticated");
     }
 
-    // Try to get the organization's stripe customer ID
-    // This is stored as organization metadata, please see https://clerk.com/docs/organizations/metadata for more information.
-    const org = await clerk.organizations.getOrganization({
-      organizationId: authData.orgID,
-    });
-    const stripeCustomerId = org.privateMetadata.stripeCustomerId;
+    const stripeCustomerId = await ensureStripeCustomerId(authData);
 
     if (!stripeCustomerId) {
       throw APIError.notFound(

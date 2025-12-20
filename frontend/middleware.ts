@@ -9,16 +9,6 @@ export default clerkMiddleware(async (auth, request) => {
 		await auth.protect();
 	}
 
-	// If we don't have an organization ID, redirect to the create organization page
-	if (!isPublic && request.nextUrl.pathname !== "/select-organization") {
-		const user = await auth();
-
-		if (!user.orgId) {
-			return NextResponse.redirect(
-				new URL("/select-organization", request.url),
-			);
-		}
-	}
 });
 
 export const config = {

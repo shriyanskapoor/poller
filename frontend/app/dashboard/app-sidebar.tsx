@@ -7,7 +7,6 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { OrganizationSwitcher } from "@clerk/nextjs";
 import { Cog, LayoutDashboard, Wallet } from "lucide-react";
 import Link from "next/link";
 
@@ -17,10 +16,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 	return (
 		<Sidebar {...rest}>
 			<SidebarHeader>
-				<OrganizationSwitcher
-					hidePersonal
-					afterSelectOrganizationUrl="/dashboard"
-				/>
+				<div className="px-3 py-2 text-sm font-semibold">Dashboard</div>
 			</SidebarHeader>
 
 			<SidebarContent>

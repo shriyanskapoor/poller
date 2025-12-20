@@ -1,4 +1,4 @@
-import { CreateOrganization, OrganizationSwitcher } from "@clerk/nextjs";
+import Link from "next/link";
 
 /**
  * This page renders the Clerk CreateOrganization component.
@@ -7,14 +7,13 @@ import { CreateOrganization, OrganizationSwitcher } from "@clerk/nextjs";
 export default function CreateOrganizationPage() {
 	return (
 		<div className="min-h-screen flex flex-col gap-4 items-center justify-center">
-			<p>Select an organization to continue.</p>
-
-			<OrganizationSwitcher
-				afterSelectOrganizationUrl="/dashboard"
-				afterCreateOrganizationUrl="/dashboard"
-				hidePersonal
-				defaultOpen
-			/>
+			<p>Organization selection is disabled for this project.</p>
+			<Link
+				href="/dashboard"
+				className="text-primary underline underline-offset-4"
+			>
+				Go to dashboard
+			</Link>
 		</div>
 	);
 }
